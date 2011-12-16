@@ -1,0 +1,61 @@
+#!/usr/bin/python
+import os, sys, pickle, commands, glob, re, mmap
+import numpy as np
+
+########################################
+
+name 	= "g0.1_epsrp_100orb"
+
+########################################
+
+os.chdir(name)
+N_mpi = 0
+regex_jobid = re.compile('[0-9]{9}\.pkl$')
+rerun = []
+for file in glob.glob("jobs*.pkl"):
+	N_mpi = N_mpi + 1
+	jobid = int(regex_jobid.findall(file)[0][0:9])
+	if jobid>-1:
+		print "checking " +file,
+
+
+		output_file = "output_%09d.txt"%(jobid)
+		size = os.stat(output_file).st_size
+		f_output = open(output_file,"r")
+		output = f_output.readlines()
+		f_output.close()
+
+
+		f = open(file,"rb")
+		queue =	pickle.load(f)
+		for job in queue:
+			ident = job[1]
+			isin = 0
+			for line in output:
+				match = re.search('^'+re.escape(ident),line)
+				if match:
+					isin = 1
+					
+			if not isin:
+				if not jobid in rerun:
+					rerun.append(jobid)
+				print "-",
+			else:
+				print "+",
+
+		print
+
+
+
+
+print "Need to resubmit %d jobs." % (len(rerun))
+
+curdir = commands.getoutput("pwd")
+for i in rerun:
+	sys.stdout.flush()
+	#print "qsub -N python%09d -d %s mpi_execute.bash" % (i,curdir)
+	os.system("qsub -N python%09d -d %s mpi_execute.bash" % (i,curdir))
+
+print "\n\nDone."
+
+		
